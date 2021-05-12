@@ -1,2 +1,2 @@
 # MNIST-AI
-My first attempt at creating number recognizing artificial intelligence
+My first attempt at creating a number recognizing artificial intelligence
