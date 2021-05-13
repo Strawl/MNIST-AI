@@ -14,6 +14,7 @@ class Data:
             path + "t10k-images.idx3-ubyte"
         ]
         self.data_array = [None] * 4
+        self.optimized_data_array = [None] * 4
 
     def read_data(self, itype, files=None):
         if itype == "train":
@@ -49,17 +50,66 @@ class Data:
             elif itype == "test":
                 self.data_array[3] = array
 
+    def get_image(self, itype, number, opt):
+        if opt:
+            if itype == "train":
+                if self.optimized_data_array[0] is None:
+                    self.optimize(itype)
+                return self.optimized_data_array[1][number]
+            elif itype == "test":
+                if self.optimized_data_array[2] is None:
+                    self.optimize(itype)
+                return self.optimized_data_array[3][number]
+        else:
+            if itype == "train":
+                if self.data_array[0] is None:
+                    self.read_data(itype)
+                return self.data_array[1][number]
+            elif itype == "test":
+                if self.data_array[2] is None:
+                    self.read_data(itype)
+                return self.data_array[3][number]
+
+    def get_label(self, itype, number, opt):
+        if opt:
+            if itype == "train":
+                if self.optimized_data_array[0] is None:
+                    self.optimize(itype)
+                return int.from_bytes(self.optimized_data_array[0][number], "big")
+            elif itype == "test":
+                if self.optimized_data_array[2] is None:
+                    self.optimize(itype)
+                return int.from_bytes(self.optimized_data_array[2][number], "big")
+        else:
+            if itype == "train":
+                if self.data_array[0] is None:
+                    self.read_data(itype)
+                return int.from_bytes(self.data_array[0][number], "big")
+            elif itype == "test":
+                if self.data_array[2] is None:
+                    self.read_data(itype)
+                return int.from_bytes(self.data_array[2][number], "big")
+
     def display_image(self, itype, number):
+        print(self.get_label(itype, number,False))
+        image = Image.fromarray(self.get_image(itype, number,False), mode="L")
+        image.show()
+
+    def optimize(self,itype):
         if itype == "train":
             if self.data_array[0] is None:
                 self.read_data(itype)
-            print(int.from_bytes(self.data_array[0][number], "big"))
-            image = Image.fromarray(self.data_array[1][number], mode="L")
-            image.show()
+            self.optimized_data_array[0] = self.data_array[0]
+            self.optimized_data_array[1] = np.copy(self.data_array[1])
+            self.optimized_data_array[1].shape = (self.optimized_data_array[1].shape[0],
+                                                  (self.optimized_data_array[1].shape[1] *
+                                                   self.optimized_data_array[1].shape[2]))
         elif itype == "test":
             if self.data_array[2] is None:
                 self.read_data(itype)
-            print(int.from_bytes(self.data_array[2][number], "big"))
-            image = Image.fromarray(self.data_array[3][number], mode="L")
-            image.show()
-            pass
+            self.optimized_data_array[2] = self.data_array[2]
+            self.optimized_data_array[3] = np.copy(self.data_array[3])
+            self.optimized_data_array[3].shape = (self.optimized_data_array[3].shape[0],
+                                                  (self.optimized_data_array[3].shape[1] *
+                                                   self.optimized_data_array[3].shape[2]))
+
