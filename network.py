@@ -1,6 +1,7 @@
 import numpy as np
 import math
 import random
+import pickle
 
 
 class Network:
@@ -21,6 +22,13 @@ class Network:
                     for l in range(0, layers_count[num]):
                         array[l] = Node(layers_count[num - 1], True)
                     self.layers.append(array)
+
+    def save(self,num):
+        pickle.dump(self, open(f"dumps/network{num}.dump", 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
+
+    @staticmethod
+    def load(num):
+        return pickle.load(open(f"dumps/network{num}.dump", 'rb'))
 
     def calculate_cost(self, data, number, itype):
         if len(self.output) == 0:
