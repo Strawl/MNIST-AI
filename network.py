@@ -2,26 +2,28 @@ import numpy as np
 import math
 import random
 import pickle
+from enum import Enum
+import logging
 
+
+logger = logging.getLogger('root')
+
+class LayerType(Enum):
+    INPUT = 1
+    HIDDEN = 2
+    OUTPUT = 3
 
 class Network:
-
     def __init__(self, layers_count):
         if len(layers_count) >= 3:
-            self.output = []
-            self.layers = []
-            self.correct = 0
-            for num in range(0, len(layers_count)):
-                if num == 0:
-                    array = np.empty(shape=(layers_count[num]), dtype=np.object0)
-                    for l in range(0, layers_count[num]):
-                        array[l] = Node(0, False)
-                    self.layers.append(array)
-                else:
-                    array = np.empty(shape=(layers_count[num]), dtype=np.object0)
-                    for l in range(0, layers_count[num]):
-                        array[l] = Node(layers_count[num - 1], True)
-                    self.layers.append(array)
+            self.output = None
+            self.node_difference = None
+            self.layers_count = layers_count
+            self.layers = np.empty(shape=(len(layers_count)), dtype=np.object0)
+            self.layers[0] = Layer(LayerType.INPUT,layers_count[0], None)
+            for num in range(1, len(layers_count)):
+                self.layers[num] = Layer(LayerType.HIDDEN,layers_count[num], self.layers[num-1])
+
 
     def save(self,num):
         pickle.dump(self, open(f"dumps/network{num}.dump", 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
@@ -30,59 +32,138 @@ class Network:
     def load(num):
         return pickle.load(open(f"dumps/network{num}.dump", 'rb'))
 
-    def calculate_cost(self, data, number, itype):
-        if len(self.output) == 0:
-            self.feed_forward(data=data, number=number, itype=itype)
-        should_be_value = data.get_label(itype=itype, number=number, opt=True)
-        right_values = [0]*10
-        right_values[should_be_value] = 1
-        cost = 0
-        for val in range(0, len(right_values)):
-            cost += (self.output[val]-right_values[val])**2
-        if should_be_value == self.output.index(max(self.output)):
-            self.correct += 1
-        return cost
+    def flush(self):
+        for i, layer in np.ndenumerate(self.layers):
+            layer.flush()
 
-    def feed_forward(self, data, number, itype):
-        image = data.get_image(itype=itype, number=number, opt=True)
-        for node in range(0, len(self.layers[0])):
-            value = int.from_bytes(image[node], "big") / 255
-            self.layers[0][node].set_input(value)
-        for layer in range(1, len(self.layers)):
-            for node in self.layers[layer]:
-                node.calculate_outcome(self.layers[layer - 1])
-        self.output = []
-        for node in self.layers[-1]:
-            self.output.append(node.value)
+    def calculate_cost(self, number):
+        if self.output is None:
+            return
+        true_values = np.zeros(shape=(self.layers_count[-1])) 
+        true_values[number] = 1
+        self.node_difference = true_values - self.output
+        cost_per_output_node = np.square(self.node_difference)
+        return np.average(cost_per_output_node)
+
+    def feed_forward(self, image):
+        self.layers[0].populate_inputs(image)
+        self.layers[-1].calculate()
+        self.output = np.asarray(self.layers[-1].get_values())
         return self.output
+
+    def backpropagate(self):
+        a_ratio = np.multiply(self.node_difference,2)
+        for i in range(len(self.layers_count)-1,0,-1):
+            a_ratio = self.layers[i].propogate_layer(a_ratio)
+    
+    def nudge(self):
+        for i in range(1,len(self.layers_count)):
+            self.layers[i].nudge_nodes()
+
+
+class Layer:
+    def __init__(self, layer_type: LayerType, neurons: int, previous_layer):
+        self.nodes = np.empty(shape=(neurons), dtype=np.object0)
+        self.layer_type = layer_type
+        self.previous_layer = previous_layer
+        for l in range(0, neurons):
+            self.nodes[l] = Node(layer_type=layer_type, previous_layer=previous_layer)
+
+    def flush(self):
+        for i, node in np.ndenumerate(self.nodes):
+            node.value = None
+            
+    def nudge_nodes(self):
+        for i, node in np.ndenumerate(self.nodes):
+            self.nodes[i].nudge_params()
+
+    def calculate(self):
+        for i,node in np.ndenumerate(self.nodes):
+            node.calculate_outcome()
+        
+    def populate_inputs(self, image):
+        if self.layer_type is LayerType.INPUT:
+            for i,node in np.ndenumerate(self.nodes):
+                value = int.from_bytes(image[i], "big") / 255
+                node.value = value
+                
+    def count(self):
+        return len(self.nodes)
+    
+    def get_value(self,index):
+        if self.nodes[index].value is None:
+            return self.nodes[index].calculate_outcome()
+        return self.nodes[index].value
+    
+    def get_values(self):
+        return list([node.value for i,node in np.ndenumerate(self.nodes)])
+            
+    def propogate_layer(self, a_ratios):
+        all_activation_ratios = []
+        for i,node in np.ndenumerate(self.nodes):
+            all_activation_ratios.append(node.calculate_derivatives(a_ratios[i]))
+        all_activation_ratios = np.asarray(all_activation_ratios)
+        return np.average(all_activation_ratios, axis=0)
 
 
 class Node:
-
-    def __init__(self, prev_count, gener_param):
-        self.prev_count = prev_count
+    def __init__(self, layer_type: LayerType, previous_layer: Layer):
         self.value = None
-        if prev_count != 0:
-            self.weights = np.array([None] * prev_count)
+        self.layer_type = layer_type
+        self.previous_layer = previous_layer
+        if layer_type != LayerType.INPUT:
+            self.weights = np.array([None] * previous_layer.count())
+            self.weight_nudges = [[] for i in range(previous_layer.count())]
+            self.bias_nudges = []
             self.bias = None
-            if gener_param:
-                self.generate_parameters()
+            self.generate_parameters()
 
     def generate_parameters(self):
-        if self.prev_count != 0:
+        if self.layer_type != LayerType.INPUT:
             for i in range(0, len(self.weights)):
                 self.weights[i] = (random.random() * 2) - 1
-            self.bias = ((random.random() * 2) - 1) * 5
+            self.bias = (random.random() * 2) - 1
 
-    def set_input(self, value):
-        self.value = value
-
-    def calculate_outcome(self, prev_layer):
-        if self.prev_count != 0:
+    def calculate_outcome(self):
+        if self.layer_type != LayerType.INPUT:
             node_sum = self.bias
-            for i in range(0, len(prev_layer)):
-                node_sum += prev_layer[i].value * self.weights[i]
-            self.set_input(sigmoid(node_sum))
+            for i in range(0, self.previous_layer.count()):
+                node_sum += self.previous_layer.get_value(i) * self.weights[i]
+            self.value = sigmoid(node_sum)
+            return node_sum
+        else: return self.value
+    
+    def calculate_derivatives(self, a_ratio):
+        z = sigmoid(a_ratio) * (1 - sigmoid(a_ratio))
+        self.bias_nudges.append(z)
+        for i,weight in enumerate(self.weight_nudges):
+            weight.append(self.previous_layer.get_value(i)*z)
+        return [weight*z for weight in self.weights]
+        
+    def nudge_params(self):
+        np_weight_nudges = np.asarray(self.weight_nudges)
+        #logger.debug(len(self.weight_nudges))
+        #logger.debug(len(self.weight_nudges[0]))
+        #logger.debug(f"We are on layer: {self.layer_type}")
+        #logger.debug("The following avarage weights have been computed:")
+        #logger.debug(np.mean(np_weight_nudges, axis=1))
+        #logger.debug(f"Shape of the result before: ")
+        #logger.debug(np_weight_nudges.shape)
+        #logger.debug(f"Shape of the result after: ")
+        #logger.debug(np.average(np_weight_nudges, axis=1).shape)
+        #logger.debug("And the following is for the avarage:")
+        #logger.debug(np.mean(self.bias_nudges))
+        #input()
+        gradient_weight = np.multiply(np.mean(np_weight_nudges, axis=1),0.001)
+        self.weights = self.weights - gradient_weight
+        gradient_bias = 0.001 * np.mean(self.bias_nudges)
+        self.bias -= gradient_bias
+
+        #self.weights = np.average(np_weight_nudges, axis=0)
+        #self.bias = self.bias - sum(self.bias_nudges)
+        self.bias_nudges = []
+        self.weight_nudges = [[] for i in range(self.previous_layer.count())]
+
 
 
 # static function required:

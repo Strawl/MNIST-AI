@@ -1,115 +1,95 @@
 import numpy as np
+import logging
+import time
+from enum import Enum
 from PIL import Image
 
+logger = logging.getLogger('root')
 
-class Data:
+# We need to create a singleton, so the data is not read multiple times
+class DataSetType(Enum):
+    TRAINING = 1
+    TESTING = 2
+class DataType(Enum):
+    LABELS = 1
+    IMAGES = 2
+class ImageForm(Enum):
+    LINEAR = 1
+    GRID = 2
+class Singleton(type):
+    _instances = {}
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
+        return cls._instances[cls]
 
-    def __init__(self, path):
-        self.TRAIN_FILES = [
-            path + "train-labels.idx1-ubyte",
-            path + "train-images.idx3-ubyte"
-        ]
-        self.TEST_FILES = [
-            path + "t10k-labels.idx1-ubyte",
-            path + "t10k-images.idx3-ubyte"
-        ]
-        self.data_array = [None] * 4
-        self.optimized_data_array = [None] * 4
+class Data(metaclass=Singleton):
+    def __init__(self, path: str):
+        self.FILES = {
+            DataSetType.TRAINING: {
+                DataType.LABELS: path + "train-labels.idx1-ubyte",
+                DataType.IMAGES: path + "train-images.idx3-ubyte"
+            },
+            DataSetType.TESTING: {
+                DataType.LABELS: path + "train-labels.idx1-ubyte",
+                DataType.IMAGES: path + "train-images.idx3-ubyte"
+            }
+        }
+        start = time.time()
+        self.DATA = {
+            DataSetType.TRAINING: {
+                DataType.LABELS: self.load_from_file(self.FILES[DataSetType.TRAINING][DataType.LABELS]),
+                DataType.IMAGES: self.load_from_file(self.FILES[DataSetType.TRAINING][DataType.IMAGES])
+            },
+            DataSetType.TESTING: {
+                DataType.LABELS: self.load_from_file(self.FILES[DataSetType.TRAINING][DataType.LABELS]),
+                DataType.IMAGES: self.load_from_file(self.FILES[DataSetType.TRAINING][DataType.IMAGES])
+            }
+        }
+        logger.debug(f"Reading all of this data took {time.time() - start:.2f} seconds") 
 
-    def read_data(self, itype, files=None):
-        if itype == "train":
-            files = self.TRAIN_FILES
-        elif itype == "test":
-            files = self.TEST_FILES
-        else:
-            return
-        with open(files[0], "rb") as f:
+
+    def load_from_file(self,file_path: str):
+        logger.debug(f"Opening the file : '{file_path}'")
+        with open(file_path, "rb") as f:
             magic_number = int.from_bytes(f.read(4), "big")
+            logger.debug(f"magic_number determines which type the file is: {magic_number}")
             item_count = int.from_bytes(f.read(4), "big")
+            logger.debug(f"There are {item_count} items in this file")
+            item_range = range(0,item_count)
+            if magic_number == 2051:
+                rows = int.from_bytes(f.read(4), "big")
+                logger.debug(f"There are {rows} rows per image")
+                columns = int.from_bytes(f.read(4), "big")
+                logger.debug(f"There are {columns} columns per image")
+                item_range = range(0,item_count*rows*columns)
             array = []
-            for items in range(0, item_count):
+            logger.debug(f"Each file is stored in a byte, we are reading bytes one by one")
+            for x in item_range:
                 array.append(f.read(1))
+            
+            logger.debug(f"Since traditional arrays don't perform well, we are converting it into a numpy array")
             array = np.array(array)
-            if itype == "train":
-                self.data_array[0] = array
-            elif itype == "test":
-                self.data_array[2] = array
 
-        with open(files[1], "rb") as f:
-            magic_number = int.from_bytes(f.read(4), "big")
-            image_count = int.from_bytes(f.read(4), "big")
-            rows = int.from_bytes(f.read(4), "big")
-            columns = int.from_bytes(f.read(4), "big")
-            array = []
-            for items in range(0, image_count * rows * columns):
-                array.append(f.read(1))
-            array = np.array(array)
-            array.shape = (image_count, rows, columns)
-            if itype == "train":
-                self.data_array[1] = array
-            elif itype == "test":
-                self.data_array[3] = array
+            if magic_number == 2051:
+                array.shape = (item_count, rows * columns)
+            return array
 
-    def get_image(self, itype, number, opt):
-        if opt:
-            if itype == "train":
-                if self.optimized_data_array[0] is None:
-                    self.optimize(itype)
-                return self.optimized_data_array[1][number]
-            elif itype == "test":
-                if self.optimized_data_array[2] is None:
-                    self.optimize(itype)
-                return self.optimized_data_array[3][number]
-        else:
-            if itype == "train":
-                if self.data_array[0] is None:
-                    self.read_data(itype)
-                return self.data_array[1][number]
-            elif itype == "test":
-                if self.data_array[2] is None:
-                    self.read_data(itype)
-                return self.data_array[3][number]
+    def get_batch(self, data_set_type: DataSetType, amount: int, start: int ):
+        images = self.DATA[data_set_type][DataType.IMAGES][start:start+amount]
+        labels = self.DATA[data_set_type][DataType.LABELS][start:start+amount]
+        return (images,labels)
 
-    def get_label(self, itype, number, opt):
-        if opt:
-            if itype == "train":
-                if self.optimized_data_array[0] is None:
-                    self.optimize(itype)
-                return int.from_bytes(self.optimized_data_array[0][number], "big")
-            elif itype == "test":
-                if self.optimized_data_array[2] is None:
-                    self.optimize(itype)
-                return int.from_bytes(self.optimized_data_array[2][number], "big")
-        else:
-            if itype == "train":
-                if self.data_array[0] is None:
-                    self.read_data(itype)
-                return int.from_bytes(self.data_array[0][number], "big")
-            elif itype == "test":
-                if self.data_array[2] is None:
-                    self.read_data(itype)
-                return int.from_bytes(self.data_array[2][number], "big")
+    def get_label(self, data_set_type: DataSetType, number: int): 
+        return int.from_bytes(self.DATA[data_set_type][DataType.LABELS][number],"big")
+    
+    def get_image(self, data_set_type: DataSetType, number:int, image_form=ImageForm.LINEAR):
+        image_raw = np.copy(self.DATA[data_set_type][DataType.IMAGES][number])
+        if image_form is ImageForm.GRID:
+            image_raw.shape = (28,28)
+        return image_raw
 
-    def display_image(self, itype, number):
-        print(self.get_label(itype, number,False))
-        image = Image.fromarray(self.get_image(itype, number,False), mode="L")
+    def display_image(self, data_set_type: DataSetType, number: int):
+        logger.debug(f"displaying the number {self.get_label(data_set_type,number)}")
+        image = Image.fromarray(self.get_image(data_set_type,number,image_form=ImageForm.GRID), mode="L")
         image.show()
-
-    def optimize(self,itype):
-        if itype == "train":
-            if self.data_array[0] is None:
-                self.read_data(itype)
-            self.optimized_data_array[0] = self.data_array[0]
-            self.optimized_data_array[1] = np.copy(self.data_array[1])
-            self.optimized_data_array[1].shape = (self.optimized_data_array[1].shape[0],
-                                                  (self.optimized_data_array[1].shape[1] *
-                                                   self.optimized_data_array[1].shape[2]))
-        elif itype == "test":
-            if self.data_array[2] is None:
-                self.read_data(itype)
-            self.optimized_data_array[2] = self.data_array[2]
-            self.optimized_data_array[3] = np.copy(self.data_array[3])
-            self.optimized_data_array[3].shape = (self.optimized_data_array[3].shape[0],
-                                                  (self.optimized_data_array[3].shape[1] *
-                                                   self.optimized_data_array[3].shape[2]))
-
