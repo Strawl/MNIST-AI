@@ -142,18 +142,6 @@ class Node:
         
     def nudge_params(self):
         np_weight_nudges = np.asarray(self.weight_nudges)
-        #logger.debug(len(self.weight_nudges))
-        #logger.debug(len(self.weight_nudges[0]))
-        #logger.debug(f"We are on layer: {self.layer_type}")
-        #logger.debug("The following avarage weights have been computed:")
-        #logger.debug(np.mean(np_weight_nudges, axis=1))
-        #logger.debug(f"Shape of the result before: ")
-        #logger.debug(np_weight_nudges.shape)
-        #logger.debug(f"Shape of the result after: ")
-        #logger.debug(np.average(np_weight_nudges, axis=1).shape)
-        #logger.debug("And the following is for the avarage:")
-        #logger.debug(np.mean(self.bias_nudges))
-        #input()
         gradient_weight = np.multiply(np.mean(np_weight_nudges, axis=1),0.001)
         self.weights = self.weights - gradient_weight
         gradient_bias = 0.001 * np.mean(self.bias_nudges)

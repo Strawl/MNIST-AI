@@ -77,10 +77,8 @@ def run_test_set(network: Network):
         feed_forward_temp[num] = network.calculate_cost(data.get_label(DataSetType.TRAINING,number=num))
         network.flush()
     cost_average = np.average(feed_forward_temp)
-    print(cost_average)
-    correctness = correct/10000
-    print(correct)
-    print(correctness)
+    logger.debug(f"The average cost is {cost_average}")
+    logger.debug(f"Out of 10000 images, {correct} were correct")
 
 
 
@@ -89,6 +87,6 @@ if __name__ == '__main__':
     start = time.time()
     network = Network([28 * 28, 16, 16, 10])
     run_test_set(network=network)
-    train(network,100,4000)
+    train(network,100,10000)
     run_test_set(network=network)
     logger.debug(f"Reading all of this data took {time.time() - start:.2f} seconds") 
