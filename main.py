@@ -84,7 +84,7 @@ if __name__ == '__main__':
     data = Data("data/")
     start = time.time()
     #network = Network([28 * 28, 16, 16, 10])
-    network = find_good_network([28 * 28, 16, 16, 10])
+    network = find_good_network(network_shape=[28 * 28, 16, 16, 10], networks_to_be_created=100, images_to_be_run=100)
     run_test_set(network=network)
     train(network,100,5000,0.01,0.9)
     run_test_set(network=network)
