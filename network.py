@@ -156,5 +156,5 @@ class Node:
 
 # static function required:
 def sigmoid(x):
-    sig = 1 / (1 + math.exp(-x))
+    sig = 1 / (1 + np.exp(-x))
     return sig
