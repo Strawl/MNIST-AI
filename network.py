@@ -56,9 +56,9 @@ class Network:
         for i in range(len(self.layers_count)-1,0,-1):
             a_ratio = self.layers[i].propogate_layer(a_ratio)
     
-    def nudge(self):
+    def nudge(self, learning_rate, decay_factor):
         for i in range(1,len(self.layers_count)):
-            self.layers[i].nudge_nodes()
+            self.layers[i].nudge_nodes(learning_rate, decay_factor)
 
 
 class Layer:
@@ -73,9 +73,9 @@ class Layer:
         for i, node in np.ndenumerate(self.nodes):
             node.value = None
             
-    def nudge_nodes(self):
+    def nudge_nodes(self, learning_factor, decay_factor):
         for i, node in np.ndenumerate(self.nodes):
-            self.nodes[i].nudge_params()
+            self.nodes[i].nudge_params(learning_factor, decay_factor)
 
     def calculate(self):
         for i,node in np.ndenumerate(self.nodes):
@@ -114,6 +114,8 @@ class Node:
         if layer_type != LayerType.INPUT:
             self.weights = np.array([None] * previous_layer.count())
             self.weight_nudges = [[] for i in range(previous_layer.count())]
+            self.previous_weight_gradient = np.zeros(shape=(previous_layer.count()))
+            self.previous_bias_gradient = 0
             self.bias_nudges = []
             self.bias = None
             self.generate_parameters()
@@ -140,15 +142,14 @@ class Node:
             weight.append(self.previous_layer.get_value(i)*z)
         return [weight*z for weight in self.weights]
         
-    def nudge_params(self):
+    def nudge_params(self, learning_factor, decay_factor):
         np_weight_nudges = np.asarray(self.weight_nudges)
-        gradient_weight = np.multiply(np.mean(np_weight_nudges, axis=1),0.001)
-        self.weights = self.weights - gradient_weight
-        gradient_bias = 0.001 * np.mean(self.bias_nudges)
-        self.bias -= gradient_bias
-
-        #self.weights = np.average(np_weight_nudges, axis=0)
-        #self.bias = self.bias - sum(self.bias_nudges)
+        gradient_weight = np.multiply(np.mean(np_weight_nudges, axis=1),(1-decay_factor)) + np.multiply(self.previous_weight_gradient,decay_factor)
+        self.previous_weight_gradient = gradient_weight
+        self.weights = self.weights - (np.multiply(gradient_weight,learning_factor))
+        gradient_bias = (1-decay_factor) * np.mean(self.bias_nudges) + decay_factor * self.previous_bias_gradient
+        self.previous_bias_gradient = gradient_bias
+        self.bias -= gradient_bias * learning_factor
         self.bias_nudges = []
         self.weight_nudges = [[] for i in range(self.previous_layer.count())]
 

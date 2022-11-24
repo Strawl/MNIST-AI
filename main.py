@@ -19,12 +19,12 @@ logger.addHandler(stream_handler)
 logger.addHandler(file_handler)
 
 
-def find_good_network(networks_to_be_created, images_to_be_run):
+def find_good_network(networks_to_be_created, images_to_be_run, network_shape):
     data = Data("data/")
     best_network = None
     cost_average = 9999
     for x in range(0, networks_to_be_created):
-        network = Network([28 * 28, 30, 30, 10])
+        network = Network(network_shape)
         feed_forward_temp = np.empty(shape=images_to_be_run, dtype=np.double)
         for num in range(0, images_to_be_run):
             output = network.feed_forward(data.get_image(DataSetType.TRAINING,number=num))
@@ -37,7 +37,7 @@ def find_good_network(networks_to_be_created, images_to_be_run):
     print(cost_average)
     return network
 
-def train(network: Network, batch_size, batch_count):
+def train(network: Network, batch_size, batch_count, learning_rate, decay_factor):
     data = Data("data/")
     for i in range(batch_count):
         logger.debug(f"Starting batch number {i}")
@@ -50,18 +50,16 @@ def train(network: Network, batch_size, batch_count):
             network.flush()
         t_cost_average = np.average(feed_forward_temp)
         logger.debug(f"Cost avarage for the batch {i} is {t_cost_average}")
-        network.nudge()
+        network.nudge(learning_rate=learning_rate, decay_factor=decay_factor)
         feed_forward_temp = np.empty(shape=batch_size, dtype=np.double)
         for x in range(batch_size):
-            #logger.debug(x)
             network.feed_forward(image=images[x])
             feed_forward_temp[x] = network.calculate_cost(int.from_bytes(labels[x],"big"))
             network.backpropagate()
             network.flush()
         t_cost_average = np.average(feed_forward_temp)
         logger.debug(f"Cost avarage for the batch {i} is {t_cost_average}")
-        network.nudge()
-        #run_test_set(network=network)
+        network.nudge(learning_rate=learning_rate, decay_factor=decay_factor)
         
 
 
@@ -85,8 +83,9 @@ def run_test_set(network: Network):
 if __name__ == '__main__':
     data = Data("data/")
     start = time.time()
-    network = Network([28 * 28, 16, 16, 10])
+    #network = Network([28 * 28, 16, 16, 10])
+    network = find_good_network([28 * 28, 16, 16, 10])
     run_test_set(network=network)
-    train(network,100,10000)
+    train(network,100,5000,0.01,0.9)
     run_test_set(network=network)
     logger.debug(f"Reading all of this data took {time.time() - start:.2f} seconds") 
