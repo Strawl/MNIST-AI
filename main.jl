@@ -16,18 +16,28 @@ end
 
 # The main function initializes the neural network, tests its performance
 # before and after training, and then plays a guessing game with the user.
-function main()
-    network = create_network([784, 300, 100, 10])
+function do_training()
+    network = create_network([784, 300, 100,10])
     println("Testing the network before training:")
     test(network)
     
-    train(network, 500, 500, 0.002, 0.0)
+    train(network, 300, 200, 0.001, 0.0)
+    filename = hash_network(network)
+    save_network(network, filename)
 
     println("Testing the network after training:")
     test(network)
 
+end
+
+function play_guess(network_hash::String)
+    network = load_network(network_hash)
     println("Now let's play a guessing game")
     guess(network)
+end
+
+function main()
+   do_training() 
 end
 
 main()

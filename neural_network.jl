@@ -1,6 +1,25 @@
 
-using .MNISTData, StatsFuns, StatsBase, Flux.Losses
+using .MNISTData, StatsFuns, StatsBase, Flux.Losses, Serialization, SHA
 
+function hash_network(network::Network)::String
+    io = IOBuffer()
+    serialize(io, network)
+    return bytes2hex(sha1(take!(io)))
+end
+
+function save_network(network::Network, filename::String)
+    open(filename, "w") do io
+        serialize(io, network)
+    end
+end
+
+# Deserialize and load the network from a file
+function load_network(filename::String)::Network
+    open(filename, "r") do io
+        network = deserialize(io)
+        return network
+    end
+end
 
 # Activation function for hidden layers
 function relu(x)
@@ -11,7 +30,6 @@ end
 function relu_prime(x)
     return x > 0 ? 1 : 0
 end
-
 
 # Network structure
 mutable struct Network
@@ -48,18 +66,25 @@ end
 # Function to test the performance of the neural network on the test dataset
 function test(network::Network)
     cost = 0
-    correct = 0
+    amount_incorrect = zeros(10)
+    amount_correct = zeros(10)
     for (num, label, image) in get_test_batch(1, 10000, true)
         output = StatsFuns.softmax(feed_forward(network, image)[end])
         true_values = zeros(10)
         true_values[label+1] = 1
         cost += Losses.crossentropy(output, true_values)
         if argmax(output) - 1 == label 
-            correct += 1
+            amount_correct[label+1] += 1
+        else
+            amount_incorrect[label+1] += 1
         end
     end
-    println("The network identified ", correct, " images correctly out of 10000")
-    println("The netowork came out with an average cost of ", cost / 10000)
+    println("The network identified $(sum(amount_correct)) images correctly out of 10000")
+    println("The netowork came out with an average cost of $(cost / 10000)")
+    for (i, (correct, incorrect)) in enumerate(zip(amount_correct, amount_incorrect))
+        println("The number $(i-1) was guessed $(correct) times correctly and $(incorrect) times incorrectly")
+    end
+
 end
 
 
