@@ -1,6 +1,6 @@
-
-include("neural_network.jl")
+include("mnist_data.jl")
 using .MNISTData
+include("neural_network.jl")
 
 # This function takes a trained neural network and uses it to make predictions
 # for images from the test dataset. It displays the images and prints the
@@ -17,13 +17,13 @@ end
 # The main function initializes the neural network, tests its performance
 # before and after training, and then plays a guessing game with the user.
 function do_training()
-    network = create_network([784, 300, 100,10])
+    network = create_network([784,10])
     println("Testing the network before training:")
     test(network)
     
-    train(network, 300, 200, 0.001, 0.0)
+    train(network, 20, 1000, 0.0004, 0.9)
     filename = hash_network(network)
-    save_network(network, filename)
+    save_network(network, "./networks/$filename")
 
     println("Testing the network after training:")
     test(network)
