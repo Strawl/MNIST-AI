@@ -56,7 +56,10 @@ function create_network(topology)
     weights = Matrix{Float64}[]
     biases = Vector{Float64}[]
     for i in 2:length(topology)
-        push!(weights, randn(topology[i-1], topology[i]) .* sqrt(2 / (topology[i-1] + topology[i])))
+        # For ReLU
+        #push!(weights, randn(topology[i-1], topology[i]) .* sqrt(2 / (topology[i-1] + topology[i])))
+        push!(weights, randn(topology[i-1], topology[i]) .* sqrt(2 / ((1 + 0.01^2) * (topology[i-1] + topology[i]))))
+
         push!(biases, zeros(topology[i]))
     end
     return Network(weights, biases, topology, length(topology))
@@ -80,7 +83,7 @@ function test(network::Network)
     cost = 0
     amount_incorrect = zeros(10)
     amount_correct = zeros(10)
-    for (num, label, image) in get_test_batch(1, 10000, true)
+    for (num, label, image) in get_test_batch(1, 10000)
         output = StatsFuns.softmax(feed_forward(network, image)[end])
         true_values = zeros(10)
         true_values[label+1] = 1
@@ -141,8 +144,9 @@ function train(network::Network, epochs, batch_size, learning_rate, decay_factor
                         weight_gradients[l][:, n, j] = activations[l] * z_n
                     end
                     if l != 1
-                        activation_gradients = mean(permutedims(network.weights[l]) .* vec(z), dims=1)
-                        z = leakyrelu_prime.(activation_gradients)
+                        #activation_gradients = mean(permutedims(network.weights[l]) .* vec(z), dims=1)
+                        #z = leakyrelu_prime.(activation_gradients)
+                        z = (network.weights[l] * z) .* leakyrelu_prime.(activations[l])
                     end
                 end
             end
@@ -155,13 +159,14 @@ function train(network::Network, epochs, batch_size, learning_rate, decay_factor
             avg_cost = cost / batch_size
             accuracy = correct / batch_size
             total_correct += correct
-            total_cost += correct
+            total_cost += cost
             #println("iteration $i, cost: $(round(avg_cost, digits=3)), accuracy: $(round(accuracy, digits=3))")
             ProgressMeter.next!(progress, showvalues = generate_showvalues(batch_idx, avg_cost, accuracy))
         end
         avg_cost = total_cost / batch_size * num_batches 
         accuracy = total_correct / batch_size * num_batches
         ProgressMeter.finish!(progress, showvalues = generate_showvalues(num_batches, avg_cost, accuracy))
+        test(network)
     end
 end
 

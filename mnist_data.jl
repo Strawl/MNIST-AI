@@ -59,10 +59,9 @@ function get_batches(batch_size)
 end
 
 
-function get_test_batch(start, amount, test::Bool=false)
+function get_test_batch(start, amount)
     return collect(zip(collect(start:start+amount-1), Int.(test_labels[start:start+amount-1]), eachrow(normalize_data(test_images[start:start+amount-1,:]))))
 end
-
 
 
 function display_image(num::Int64,test::Bool=false)
@@ -76,9 +75,10 @@ end
 
 
 function normalize_data(data)
-    mean_data = mean(data)
-    std_data = std(data)
-    return (data .- mean_data) ./ std_data
+    #mean_data = mean(data)
+    #std_data = std(data)
+    #return (data .- mean_data) ./ std_data
+    return data ./ 255
 end
 
 end
