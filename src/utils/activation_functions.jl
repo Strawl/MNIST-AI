@@ -24,5 +24,10 @@ function leakyrelu_prime(x, alpha=0.01)
     return x > 0 ? 1 : alpha
 end
 
+export softmax
+function softmax(input_vector)
+    denominator = sum([exp(x) for x in input_vector])
+    return [exp(x)/denominator for x in input_vector]
+end
     
 end

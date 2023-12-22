@@ -1,10 +1,9 @@
-module MNISTData
+module MNISTLoader
+include("../settings.jl")
 using HTTP, Downloads, ImageInTerminal, Random, Images, CodecZlib, Statistics
-
 
 export test_images, train_images, test_labels, train_labels, get_test_batch, get_batches, display_image
 
-data_dir = "./data"
 urls_filenames = [
     ("http://yann.lecun.com/exdb/mnist/train-labels-idx1-ubyte.gz", "train_labels"),
     ("http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz", "train_images"),
@@ -12,14 +11,11 @@ urls_filenames = [
     ("http://yann.lecun.com/exdb/mnist/t10k-labels-idx1-ubyte.gz", "test_labels")
 ]
 
-if !isdir(data_dir)
-    mkdir(data_dir)
-end
 
 
 for (url, filename) in urls_filenames
-    filepath = joinpath(data_dir, filename * ".gz")
-    decompressed_filepath = joinpath(data_dir, filename)
+    filepath = joinpath(DATA_DIR, filename * ".gz")
+    decompressed_filepath = joinpath(DATA_DIR, filename)
     if !isfile(decompressed_filepath)
         if !isfile(filepath)
             println("Downloading $filename from $url")
@@ -39,10 +35,10 @@ for (url, filename) in urls_filenames
 end
 
 
-train_labels = permutedims(read("./data/train_labels")[9:60000+8])
-test_labels = permutedims(read("./data/test_labels")[9:10000+8])
-test_images = permutedims(reshape(read("./data/test_images")[17:10000*784+16],(784,10000)))
-train_images = permutedims(reshape(read("./data/train_images")[17:60000*784+16],(784,60000)))
+train_labels = permutedims(read(DATA_DIR*"/train_labels")[9:60000+8])
+test_labels = permutedims(read(DATA_DIR*"/test_labels")[9:10000+8])
+test_images = permutedims(reshape(read(DATA_DIR*"/test_images")[17:10000*784+16],(784,10000)))
+train_images = permutedims(reshape(read(DATA_DIR*"/train_images")[17:60000*784+16],(784,60000)))
 
 
 function get_batches(batch_size)

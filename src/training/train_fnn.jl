@@ -1,72 +1,16 @@
+module TrainFNN
 
-using .MNISTData, .ActivationFunctions, .Losses
-using Statistics, StatsFuns, Serialization, SHA, ProgressMeter 
+using ..FNN, ..MNISTLoader, ..ActivationFunctions, ..Losses
+using ProgressMeter, Statistics
 
-
-# Network structure
-mutable struct Network
-    weights::Vector{Matrix{Float64}}
-    biases::Vector{Vector{Float64}}
-    topology::Vector{Int64}
-    network_size::Int64
-end
-
-function hash_network(network::Network)::String
-    io = IOBuffer()
-    serialize(io, network)
-    return bytes2hex(sha1(take!(io)))
-end
-
-function save_network(network::Network, filename::String)
-    open(filename, "w") do io
-        serialize(io, network)
-    end
-end
-
-# Deserialize and load the network from a file
-function load_network(filename::String)::Network
-    open(filename, "r") do io
-        network = deserialize(io)
-        return network
-    end
-end
-
-
-
-# Function to create a new neural network with a given topology
-function create_network(topology)
-    weights = Matrix{Float64}[]
-    biases = Vector{Float64}[]
-    for i in 2:length(topology)
-        # For ReLU
-        #push!(weights, randn(topology[i-1], topology[i]) .* sqrt(2 / (topology[i-1] + topology[i])))
-        push!(weights, randn(topology[i-1], topology[i]) .* sqrt(2 / ((1 + 0.01^2) * (topology[i-1] + topology[i]))))
-
-        push!(biases, zeros(topology[i]))
-    end
-    return Network(weights, biases, topology, length(topology))
-end
-
-# Function to perform a feed-forward pass through the network, given an input activation
-function feed_forward(network::Network, activation)
-    activations = Vector{Float64}[]
-    push!(activations, activation)
-    for i in 1:network.network_size-2
-        activation = permutedims(network.weights[i]) * activation .+ network.biases[i]
-        push!(activations, ActivationFunctions.leakyrelu.(activation))
-    end
-    activation = permutedims(network.weights[end]) * activation .+ network.biases[end]
-    push!(activations, activation)
-    return activations
-end
-
+export test, train
 # Function to test the performance of the neural network on the test dataset
-function test(network::Network)
+function test(network::FNN.Network)
     cost = 0
     amount_incorrect = zeros(10)
     amount_correct = zeros(10)
-    for (num, label, image) in get_test_batch(1, 10000)
-        output = StatsFuns.softmax(feed_forward(network, image)[end])
+    for (num, label, image) in MNISTLoader.get_test_batch(1, 10000)
+        output = ActivationFunctions.softmax(feed_forward(network, image)[end])
         true_values = zeros(10)
         true_values[label+1] = 1
         cost += Losses.crossentropy(output, true_values)
@@ -86,7 +30,7 @@ end
 
 
 #Function to train the neural network using stochastic gradient descent and momentum
-function train(network::Network, epochs, batch_size, learning_rate, decay_factor)
+function train(network::FNN.Network, epochs, batch_size, learning_rate, decay_factor)
     previous_weight_gradients = Matrix{Float64}[]
     previous_bias_gradients = Vector{Float64}[]
     for i in 2:length(network.topology)
@@ -112,7 +56,7 @@ function train(network::Network, epochs, batch_size, learning_rate, decay_factor
             end
             Threads.@threads for (j, (label, image)) in collect(enumerate(batch))
                 activations = feed_forward(network, image)
-                output = StatsFuns.softmax(activations[end])
+                output = ActivationFunctions.softmax(activations[end])
                 if argmax(output) - 1 == label
                     correct += 1
                 end
@@ -150,3 +94,4 @@ function train(network::Network, epochs, batch_size, learning_rate, decay_factor
     end
 end
 
+end
