@@ -1,5 +1,6 @@
 
-using Statistics, StatsFuns, StatsBase, Flux.Losses, Serialization, SHA, .MNISTData, ProgressMeter
+using .MNISTData, .ActivationFunctions, .Losses
+using Statistics, StatsFuns, Serialization, SHA, ProgressMeter 
 
 
 # Network structure
@@ -30,25 +31,6 @@ function load_network(filename::String)::Network
     end
 end
 
-# Activation function for hidden layers
-function relu(x)
-    return max(0, x)
-end
-
-# Derivative of the ReLU activation function
-function relu_prime(x)
-    return x > 0 ? 1 : 0
-end
-
-# Leaky ReLU activation function
-function leakyrelu(x, alpha=0.01)
-    return max(alpha * x, x)
-end
-
-# Derivative of the Leaky ReLU activation function
-function leakyrelu_prime(x, alpha=0.01)
-    return x > 0 ? 1 : alpha
-end
 
 
 # Function to create a new neural network with a given topology
@@ -71,7 +53,7 @@ function feed_forward(network::Network, activation)
     push!(activations, activation)
     for i in 1:network.network_size-2
         activation = permutedims(network.weights[i]) * activation .+ network.biases[i]
-        push!(activations, leakyrelu.(activation))
+        push!(activations, ActivationFunctions.leakyrelu.(activation))
     end
     activation = permutedims(network.weights[end]) * activation .+ network.biases[end]
     push!(activations, activation)
@@ -144,9 +126,7 @@ function train(network::Network, epochs, batch_size, learning_rate, decay_factor
                         weight_gradients[l][:, n, j] = activations[l] * z_n
                     end
                     if l != 1
-                        #activation_gradients = mean(permutedims(network.weights[l]) .* vec(z), dims=1)
-                        #z = leakyrelu_prime.(activation_gradients)
-                        z = (network.weights[l] * z) .* leakyrelu_prime.(activations[l])
+                        z = (network.weights[l] * z) .* ActivationFunctions.leakyrelu_prime.(activations[l])
                     end
                 end
             end

@@ -1,4 +1,6 @@
 include("mnist_data.jl")
+include("losses.jl")
+include("activation_functions.jl")
 using .MNISTData
 include("neural_network.jl")
 
@@ -25,11 +27,11 @@ end
 # The main function initializes the neural network, tests its performance
 # before and after training, and then plays a guessing game with the user.
 function do_training()
-    network = create_network([784, 512,  256, 128, 10])
+    network = create_network([784,10])
     println("Testing the network before training:")
     test(network)
     
-    train(network, 30, 500, 0.001, 0.9)
+    train(network, 15, 300, 0.001, 0.9)
     filename = hash_network(network)
     save_network(network, "./networks/$filename")
 
