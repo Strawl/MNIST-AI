@@ -1,6 +1,6 @@
 module FNN
 
-export FNN, create_network, feed_forward
+export FNN, create_network, feed_forward, Network
 # Network structure
 mutable struct Network
     weights::Vector{Matrix{Float64}}
